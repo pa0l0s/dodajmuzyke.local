@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="pl" x-data="app()" x-init="init()">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>dodajmuzyke.local</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <main class="max-w-xl mx-auto p-3 pb-24">
+    <header class="mb-4">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <h1 class="text-3xl font-black tracking-tight">Dodaj muzykę</h1>
+          <p class="text-slate-400 text-sm">YouTube, upload, tagowanie, Navidrome</p>
+        </div>
+        <div class="rounded-2xl px-3 py-2 text-xs" :class="health.ok ? 'bg-emerald-500/20 text-emerald-200' : 'bg-amber-500/20 text-amber-100'">
+          <span x-text="health.ok ? 'OK' : 'Narzędzia?' "></span>
+        </div>
+      </div>
+      <p x-show="notice" x-text="notice" class="mt-3 rounded-2xl bg-blue-500/15 text-blue-100 px-3 py-2 text-sm"></p>
+    </header>
+
+    <nav class="grid grid-cols-3 gap-2 mb-4 sticky top-2 z-10 bg-slate-950/90 backdrop-blur py-2">
+      <button @click="tab='yt'" class="rounded-2xl py-3 font-bold" :class="tab==='yt' ? 'bg-blue-500 text-white' : 'bg-slate-800'">YouTube</button>
+      <button @click="tab='upload'" class="rounded-2xl py-3 font-bold" :class="tab==='upload' ? 'bg-blue-500 text-white' : 'bg-slate-800'">Upload</button>
+      <button @click="tab='queue'" class="rounded-2xl py-3 font-bold" :class="tab==='queue' ? 'bg-blue-500 text-white' : 'bg-slate-800'">Kolejka</button>
+    </nav>
+
+    <section x-show="tab==='yt'" class="space-y-4">
+      <div class="bg-slate-900 rounded-3xl p-4 shadow-xl">
+        <label class="text-sm text-slate-300">Nazwa utworu albo URL YouTube</label>
+        <textarea x-model="query" rows="3" class="mt-2 w-full rounded-2xl bg-slate-800 border border-slate-700 p-4 text-lg" placeholder="np. Massive Attack Teardrop albo https://youtu.be/..."></textarea>
+        <div class="grid grid-cols-2 gap-3 mt-3">
+          <button @click="search()" :disabled="searching" class="rounded-2xl bg-slate-700 py-4 font-bold disabled:opacity-50" x-text="searching ? 'Szukam...' : 'Szukaj'"></button>
+          <button @click="download(query)" class="rounded-2xl bg-emerald-600 py-4 font-bold">Pobierz teraz</button>
+        </div>
+        <p x-show="searchError" x-text="searchError" class="mt-3 rounded-2xl bg-red-500/15 text-red-100 px-3 py-2 text-sm"></p>
+      </div>
+      <div class="space-y-3">
+        <template x-for="item in results" :key="item.webpage_url || item.id">
+          <article class="bg-slate-900 rounded-3xl p-4 flex gap-3 items-start">
+            <div class="flex-1">
+              <h3 class="font-bold leading-tight" x-text="item.title"></h3>
+              <p class="text-sm text-slate-400 mt-1"><span x-text="item.uploader"></span> · <span x-text="formatDuration(item.duration)"></span></p>
+            </div>
+            <button @click="download(item.webpage_url)" class="rounded-2xl bg-emerald-600 px-4 py-3 font-bold">+</button>
+          </article>
+        </template>
+      </div>
+    </section>
+
+    <section x-show="tab==='upload'" class="space-y-4">
+      <div class="bg-slate-900 rounded-3xl p-5 border-2 border-dashed border-slate-700 text-center">
+        <p class="font-bold text-lg">Wrzuć plik audio albo ZIP/RAR</p>
+        <p class="text-slate-400 text-sm mt-1">MP3, WAV, FLAC, M4A, ZIP, RAR. WAV/FLAC/M4A zostaną przekonwertowane do MP3 VBR V0.</p>
+        <input type="file" multiple @change="uploadFiles($event)" class="mt-5 block w-full text-sm file:mr-4 file:rounded-2xl file:border-0 file:bg-blue-600 file:px-5 file:py-4 file:text-white file:font-bold" />
+      </div>
+      <template x-for="u in uploads" :key="u.name">
+        <div class="rounded-2xl bg-slate-800 p-3 text-sm" x-text="u.name + ': ' + u.status"></div>
+      </template>
+    </section>
+
+    <section x-show="tab==='queue'" class="space-y-2">
+      <div class="flex gap-2">
+        <button @click="loadJobs" class="flex-1 rounded-2xl bg-slate-800 py-3 font-bold">Odśwież</button>
+        <button @click="collapseAll" class="rounded-2xl bg-slate-800 px-4 py-3 font-bold">Zwiń</button>
+      </div>
+      <template x-for="job in jobs" :key="job.id">
+        <article class="bg-slate-900 rounded-2xl overflow-hidden border border-slate-800">
+          <button @click="toggle(job)" class="w-full text-left p-3 flex items-center gap-3">
+            <div class="text-xl shrink-0" x-text="icon(job.status)"></div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 min-w-0">
+                <h3 class="font-bold truncate text-sm" x-text="displayTitle(job)"></h3>
+                <span x-show="job.duplicate" class="rounded-lg bg-purple-500/20 text-purple-100 px-2 py-0.5 text-[10px]">duplikat</span>
+              </div>
+              <p class="text-xs text-slate-400 truncate" x-text="job.message || job.status"></p>
+            </div>
+            <span class="rounded-xl px-2 py-1 text-[10px] font-bold shrink-0" :class="badge(job.status)" x-text="job.status"></span>
+            <span class="text-slate-500 shrink-0" x-text="expanded[job.id] ? '▴' : '▾'"></span>
+          </button>
+
+          <div x-show="expanded[job.id]" x-transition class="px-3 pb-3 space-y-3 border-t border-slate-800">
+            <p class="text-xs text-slate-500 break-all pt-3" x-text="job.result_path || job.source || job.id"></p>
+            <template x-if="job.metadata?.suggested">
+              <div class="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-100">
+                <p class="font-bold mb-1">Sugestia z YouTube</p>
+                <p><span x-text="job.metadata.suggested.artist"></span> — <span x-text="job.metadata.suggested.title"></span></p>
+                <p class="text-emerald-200/70"><span x-text="job.metadata.suggested.album"></span> · <span x-text="job.metadata.suggested.year"></span></p>
+              </div>
+            </template>
+
+            <div x-show="job.status==='unmatched'" class="grid gap-2">
+              <input x-model="manual[job.id].artist" placeholder="Artist" class="rounded-xl bg-slate-800 p-3" />
+              <input x-model="manual[job.id].title" placeholder="Title" class="rounded-xl bg-slate-800 p-3" />
+              <input x-model="manual[job.id].album" placeholder="Album" class="rounded-xl bg-slate-800 p-3" />
+              <div class="grid grid-cols-2 gap-2">
+                <input x-model="manual[job.id].year" placeholder="Year" class="rounded-xl bg-slate-800 p-3" />
+                <input x-model="manual[job.id].track" placeholder="Track" class="rounded-xl bg-slate-800 p-3" />
+              </div>
+              <button @click.stop="manualMatch(job.id)" class="rounded-2xl bg-blue-600 py-3 font-bold">Zapisz ręcznie</button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <button @click.stop="deleteJob(job.id)" class="rounded-2xl bg-red-600/90 py-3 font-bold">Usuń z kolejki</button>
+              <button @click.stop="expanded[job.id]=false" class="rounded-2xl bg-slate-700 py-3 font-bold">Zamknij</button>
+            </div>
+          </div>
+        </article>
+      </template>
+    </section>
+  </main>
+
+<script>
+function app(){return{
+  tab:'yt', query:'', results:[], jobs:[], uploads:[], manual:{}, expanded:{}, health:{ok:false}, timer:null, notice:'', searching:false, searchError:'',
+  async init(){ await this.loadHealth(); await this.loadJobs(); this.timer=setInterval(()=>this.loadJobs(), 4000); },
+  async loadHealth(){ this.health = await (await fetch('/healthz')).json(); },
+  async search(){
+    if(!this.query.trim()) return;
+    this.searching=true; this.searchError=''; this.results=[];
+    try{
+      const r=await fetch('/api/search?q='+encodeURIComponent(this.query));
+      if(!r.ok) throw new Error(await r.text());
+      const d=await r.json(); this.results=d.items||[];
+      if(!this.results.length) this.searchError='Nie znaleziono wyników.';
+    }catch(e){
+      this.searchError='Wyszukiwanie nie powiodło się: '+(e?.message||e);
+    }finally{
+      this.searching=false;
+    }
+  },
+  async download(q){
+    if(!q) return;
+    const r=await fetch('/api/youtube',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
+    const d=await r.json();
+    this.notice = d.duplicate ? 'Duplikat: ten utwór już jest w kolejce/bibliotece.' : 'Dodano do kolejki.';
+    this.tab='queue'; await this.loadJobs(); if(d.id) this.expanded[d.id]=true;
+  },
+  async uploadFiles(e){ for(const f of e.target.files){ const row={name:f.name,status:'wysyłam...'}; this.uploads.unshift(row); const fd=new FormData(); fd.append('file',f); const r=await fetch('/api/upload',{method:'POST',body:fd}); row.status = r.ok ? 'dodano do kolejki' : (await r.text()); } this.tab='queue'; await this.loadJobs(); },
+  async loadJobs(){ const d=await (await fetch('/api/jobs')).json(); this.jobs=d.items||[]; for(const j of this.jobs){ const s=j.metadata?.suggested||{}; if(!this.manual[j.id]) this.manual[j.id]={artist:s.artist||'',title:s.title||j.metadata?.clean_title||j.title,album:s.album||'',year:s.year||'',track:s.track||''}; } },
+  toggle(job){ this.expanded[job.id]=!this.expanded[job.id]; },
+  collapseAll(){ this.expanded={}; },
+  async manualMatch(id){ await fetch(`/api/jobs/${id}/manual`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.manual[id])}); await this.loadJobs(); },
+  async deleteJob(id){ const r=await fetch(`/api/jobs/${id}`,{method:'DELETE'}); this.notice = r.ok ? 'Usunięto z kolejki.' : await r.text(); await this.loadJobs(); },
+  displayTitle(j){ return j.metadata?.suggested ? `${j.metadata.suggested.artist} — ${j.metadata.suggested.title}` : j.title; },
+  formatDuration(s){ if(!s) return ''; const m=Math.floor(s/60), sec=String(Math.floor(s%60)).padStart(2,'0'); return `${m}:${sec}`; },
+  icon(s){ return {queued:'⏳',downloading:'⬇️',extracting:'📦',converting:'🎚️',tagging:'🏷️',done:'✅',unmatched:'❔',failed:'⚠️'}[s] || '•'; },
+  badge(s){ return {done:'bg-emerald-500/20 text-emerald-200',unmatched:'bg-amber-500/20 text-amber-100',failed:'bg-red-500/20 text-red-100'}[s] || 'bg-blue-500/20 text-blue-100'; }
+}}
+</script>
+</body>
+</html>

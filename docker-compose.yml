@@ -1,0 +1,49 @@
+services:
+  dodajmuzyke:
+    build: .
+    image: dodajmuzyke:local
+    container_name: dodajmuzyke
+    restart: unless-stopped
+    environment:
+      DODAJMUZYKE_MUSIC_DIR: /music
+      DODAJMUZYKE_WORK_DIR: /downloads
+      DODAJMUZYKE_DATABASE_PATH: /downloads/dodajmuzyke.sqlite3
+      DODAJMUZYKE_PUBLIC_BASE_URL: http://dodajmuzyke.local
+      # Opcjonalnie: klucz AcoustID zwiększa trafność fingerprintingu.
+      # DODAJMUZYKE_ACOUSTID_API_KEY: wpisz_tutaj_lub_w_stack_env
+    volumes:
+      # Zmień lewą stronę na realny katalog biblioteki Navidrome na OMV.
+      - /srv/dev-disk-by-label-DATA/Music:/music
+      # Tymczasowe pliki robocze i SQLite kolejki.
+      - /srv/dev-disk-by-label-DATA/DockerConfig/dodajmuzyke/downloads:/downloads
+    ports:
+      - "8087:8000"
+    networks:
+      - media
+
+  # Opcjonalny lokalny reverse proxy, jeżeli na OMV nie masz jeszcze nginx/npm/traefik.
+  # Jeśli masz już proxy, wyłącz tę usługę i dodaj host dodajmuzyke.local -> http://IP_OMV:8087.
+  caddy:
+    image: caddy:2-alpine
+    container_name: media-local-proxy
+    restart: unless-stopped
+    depends_on:
+      - dodajmuzyke
+    ports:
+      - "80:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - media
+
+networks:
+  media:
+    name: media
+
+volumes:
+  caddy_data:
+  caddy_config:

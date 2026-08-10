@@ -1,0 +1,9 @@
+dodajmuzyke.local {
+    reverse_proxy dodajmuzyke:8000
+}
+
+# Zakładamy, że Navidrome działa na tym samym hoście OMV na porcie 4533.
+# Jeśli jest w tej samej sieci docker 'media', możesz zmienić na: reverse_proxy navidrome:4533
+muzyka.local, ndns.muzyka.local {
+    reverse_proxy host.docker.internal:4533
+}

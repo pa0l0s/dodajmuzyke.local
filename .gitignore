@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# Runtime data
+.env
+*.sqlite3
+*.db
+downloads/
+music/
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Build/output
+dist/
+build/
+*.egg-info/

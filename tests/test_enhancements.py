@@ -157,6 +157,23 @@ def test_youtube_info_and_download_explicitly_enable_node_runtime(tmp_path: Path
     assert download_args[download_args.index('--js-runtimes') + 1] == 'node'
 
 
+def test_youtube_download_uses_mweb_po_token_provider_when_configured(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv('DODAJMUZYKE_POT_PROVIDER_URL', 'http://bgutil-provider:4416')
+    args = youtube_download_args('https://youtu.be/example', tmp_path)
+    extractor_values = [args[i + 1] for i, value in enumerate(args) if value == '--extractor-args']
+    assert 'youtube:player_client=mweb' in extractor_values
+    assert 'youtubepot-bgutilhttp:base_url=http://bgutil-provider:4416' in extractor_values
+
+
+def test_container_has_supported_node_and_matching_ejs_package():
+    root = Path(__file__).parents[1]
+    dockerfile = (root / 'Dockerfile').read_text()
+    requirements = (root / 'requirements.txt').read_text()
+    assert 'FROM node:22' in dockerfile
+    assert 'yt-dlp[default]==2026.7.4' in requirements
+    assert 'bgutil-ytdlp-pot-provider' in requirements
+
+
 def test_job_store_reuses_existing_youtube_key_and_can_delete(tmp_path: Path):
     store = JobStore(tmp_path / 'jobs.sqlite3')
     job = store.create('youtube', 'x', source='https://youtu.be/HqLuWmW3CPM?si=abc', metadata={'youtube_key': 'youtube:HqLuWmW3CPM'})

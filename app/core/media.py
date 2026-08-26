@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import shutil
 import subprocess
 import zipfile
@@ -80,11 +81,20 @@ def _youtube_source(query_or_url: str) -> str:
     return query_or_url if query_or_url.startswith(("http://", "https://")) else f"ytsearch1:{query_or_url}"
 
 
+def _youtube_runtime_args() -> list[str]:
+    args = ["--js-runtimes", "node"]
+    provider_url = os.getenv("DODAJMUZYKE_POT_PROVIDER_URL", "").strip().rstrip("/")
+    if provider_url:
+        args.extend(["--extractor-args", "youtube:player_client=mweb"])
+        args.extend(["--extractor-args", f"youtubepot-bgutilhttp:base_url={provider_url}"])
+    return args
+
+
 def youtube_info_args(query_or_url: str) -> list[str]:
     return [
         "yt-dlp", _youtube_source(query_or_url),
         "--dump-single-json", "--skip-download", "--no-playlist",
-        "--js-runtimes", "node",
+        *_youtube_runtime_args(),
     ]
 
 
@@ -93,7 +103,7 @@ def youtube_download_args(query_or_url: str, target_dir: Path) -> list[str]:
     return [
         "yt-dlp", _youtube_source(query_or_url),
         "-x", "--audio-format", "mp3", "--audio-quality", "0",
-        "--no-playlist", "--js-runtimes", "node", "-o", output_template,
+        "--no-playlist", *_youtube_runtime_args(), "-o", output_template,
     ]
 
 

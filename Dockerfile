@@ -1,4 +1,9 @@
+FROM node:22-bookworm-slim AS node-runtime
+
 FROM python:3.12-slim
+
+# yt-dlp requires Node >=22 for YouTube's external JS challenges.
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -10,7 +15,6 @@ RUN apt-get update \
         curl \
         ffmpeg \
         libchromaprint-tools \
-        nodejs \
         unzip \
         unrar-free \
     && rm -rf /var/lib/apt/lists/*

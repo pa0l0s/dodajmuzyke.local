@@ -296,7 +296,8 @@ Dockerfile instaluje:
 - `fpcalc` / `libchromaprint-tools`,
 - `unzip`,
 - `unrar-free`,
-- `nodejs` jako JavaScript runtime dla trudniejszych przypadków YouTube/yt-dlp.
+- `Node.js 22` jako wspierany JavaScript runtime dla challenge solvera YouTube/yt-dlp.
+- `bgutil-ytdlp-pot-provider` jako lokalny sidecar generujący wymagane przez YouTube PO Tokeny; port `4416` pozostaje tylko w sieci Dockera.
 
 ## Development lokalny
 
@@ -323,11 +324,19 @@ Wyszukiwanie YouTube idzie przez `yt-dlp` i może trwać kilkanaście-kilkadzies
 
 ### YouTube zwraca 403 / Precondition failed / Requested format unavailable
 
-Najpierw zaktualizuj `yt-dlp` i przebuduj obraz:
+Aktualna konfiguracja używa Node.js 22, `yt-dlp-ejs` oraz sidecara `bgutil-provider` dla PO Tokenów. Najpierw zaktualizuj obrazy i przebuduj aplikację:
 
 ```bash
 docker compose build --no-cache dodajmuzyke
-docker compose up -d
+docker compose pull bgutil-provider
+docker compose up -d --force-recreate
+```
+
+Sprawdź oba kontenery:
+
+```bash
+docker compose ps
+docker compose logs bgutil-provider --tail 50
 ```
 
 ### Navidrome nie widzi nowych plików

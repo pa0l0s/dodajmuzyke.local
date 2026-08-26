@@ -1,7 +1,13 @@
 from pathlib import Path
 
 from app.core.matching import infer_metadata_suggestion, youtube_video_key
-from app.core.media import parse_yt_dlp_json, parse_yt_dlp_json_lines
+from app.core.media import (
+    parse_yt_dlp_json,
+    parse_yt_dlp_json_lines,
+    youtube_download_args,
+    youtube_info_args,
+    youtube_search_args,
+)
 from app.core.state import JobStore
 from app.worker import collect_known_artists
 
@@ -134,6 +140,21 @@ def test_parse_yt_dlp_json_ignores_warning_lines_before_json():
 def test_parse_yt_dlp_json_lines_ignores_warnings_and_progress_lines():
     rows = parse_yt_dlp_json_lines('WARNING: missing JS runtime\n[youtube] searching\n{"title":"Veganka","id":"22oNZe1H2qI","webpage_url":"https://youtu.be/22oNZe1H2qI"}\n')
     assert rows == [{"title": "Veganka", "id": "22oNZe1H2qI", "webpage_url": "https://youtu.be/22oNZe1H2qI"}]
+
+
+def test_youtube_search_uses_flat_playlist_and_ignores_unavailable_results():
+    args = youtube_search_args('nabita lufa', 8)
+    assert args[:2] == ['yt-dlp', 'ytsearch8:nabita lufa']
+    assert '--flat-playlist' in args
+    assert '--ignore-errors' in args
+    assert '--no-warnings' in args
+
+
+def test_youtube_info_and_download_explicitly_enable_node_runtime(tmp_path: Path):
+    info_args = youtube_info_args('https://youtu.be/example')
+    download_args = youtube_download_args('https://youtu.be/example', tmp_path)
+    assert info_args[info_args.index('--js-runtimes') + 1] == 'node'
+    assert download_args[download_args.index('--js-runtimes') + 1] == 'node'
 
 
 def test_job_store_reuses_existing_youtube_key_and_can_delete(tmp_path: Path):

@@ -54,8 +54,16 @@ def parse_yt_dlp_json_lines(output: str) -> list[dict]:
     return rows
 
 
+def youtube_search_args(query: str, limit: int = 8) -> list[str]:
+    return [
+        "yt-dlp", f"ytsearch{limit}:{query}",
+        "--flat-playlist", "--dump-json", "--skip-download", "--no-playlist",
+        "--ignore-errors", "--no-warnings",
+    ]
+
+
 async def youtube_search(query: str, limit: int = 8) -> list[dict]:
-    out = await run_cmd(["yt-dlp", f"ytsearch{limit}:{query}", "--dump-json", "--skip-download", "--no-playlist"], timeout=90)
+    out = await run_cmd(youtube_search_args(query, limit), timeout=90)
     items = []
     for data in parse_yt_dlp_json_lines(out):
         items.append({
@@ -68,21 +76,35 @@ async def youtube_search(query: str, limit: int = 8) -> list[dict]:
     return items
 
 
+def _youtube_source(query_or_url: str) -> str:
+    return query_or_url if query_or_url.startswith(("http://", "https://")) else f"ytsearch1:{query_or_url}"
+
+
+def youtube_info_args(query_or_url: str) -> list[str]:
+    return [
+        "yt-dlp", _youtube_source(query_or_url),
+        "--dump-single-json", "--skip-download", "--no-playlist",
+        "--js-runtimes", "node",
+    ]
+
+
+def youtube_download_args(query_or_url: str, target_dir: Path) -> list[str]:
+    output_template = str(target_dir / "%(title).180B.%(ext)s")
+    return [
+        "yt-dlp", _youtube_source(query_or_url),
+        "-x", "--audio-format", "mp3", "--audio-quality", "0",
+        "--no-playlist", "--js-runtimes", "node", "-o", output_template,
+    ]
+
+
 async def youtube_info(query_or_url: str) -> dict:
-    source = query_or_url if query_or_url.startswith(("http://", "https://")) else f"ytsearch1:{query_or_url}"
-    out = await run_cmd(["yt-dlp", source, "--dump-single-json", "--skip-download", "--no-playlist"], timeout=120)
+    out = await run_cmd(youtube_info_args(query_or_url), timeout=120)
     return parse_yt_dlp_json(out)
 
 
 async def download_youtube_audio(query_or_url: str, target_dir: Path) -> Path:
     target_dir.mkdir(parents=True, exist_ok=True)
-    output_template = str(target_dir / "%(title).180B.%(ext)s")
-    source = query_or_url if query_or_url.startswith(("http://", "https://")) else f"ytsearch1:{query_or_url}"
-    await run_cmd([
-        "yt-dlp", source,
-        "-x", "--audio-format", "mp3", "--audio-quality", "0",
-        "--no-playlist", "-o", output_template,
-    ], timeout=1800)
+    await run_cmd(youtube_download_args(query_or_url, target_dir), timeout=1800)
     mp3s = sorted(target_dir.glob("*.mp3"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not mp3s:
         raise ToolError("yt-dlp nie zwrócił pliku MP3")

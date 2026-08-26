@@ -137,7 +137,8 @@ Nie commituj prawdziwych sekretów.
 ### 5. Uruchom
 
 ```bash
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 Sprawdź kontenery:
@@ -162,7 +163,8 @@ Poprawny wynik zawiera m.in.:
 
 ```bash
 git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 ## Przykładowy `docker-compose.yml`
@@ -171,16 +173,23 @@ Repo zawiera gotowy `docker-compose.yml`. Minimalna usługa wygląda tak:
 
 ```yaml
 services:
+  bgutil-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:1.3.2
+    restart: unless-stopped
+
   dodajmuzyke:
-    build: .
-    image: dodajmuzyke:local
+    image: ghcr.io/pa0l0s/dodajmuzyke.local:latest
+    pull_policy: always
     container_name: dodajmuzyke
     restart: unless-stopped
+    depends_on:
+      - bgutil-provider
     environment:
       DODAJMUZYKE_MUSIC_DIR: /music
       DODAJMUZYKE_WORK_DIR: /downloads
       DODAJMUZYKE_DATABASE_PATH: /downloads/dodajmuzyke.sqlite3
       DODAJMUZYKE_PUBLIC_BASE_URL: http://dodajmuzyke.local
+      DODAJMUZYKE_POT_PROVIDER_URL: http://bgutil-provider:4416
     volumes:
       - /srv/music/Music_Sorted:/music
       - /srv/docker/dodajmuzyke/downloads:/downloads
@@ -287,7 +296,15 @@ DELETE /api/jobs/{id}
 POST   /api/jobs/{id}/manual    {"artist":"...","title":"...","album":"...","year":"...","track":"..."}
 ```
 
-## Wymagane narzędzia w kontenerze
+## Obraz i wymagane narzędzia
+
+Publiczny obraz aplikacji:
+
+```text
+ghcr.io/pa0l0s/dodajmuzyke.local:latest
+```
+
+Workflow `.github/workflows/docker-publish.yml` buduje obrazy `linux/amd64` i `linux/arm64` po każdym pushu do `main` oraz publikuje tagi `latest`, `sha-*` i tagi wydań `v*`.
 
 Dockerfile instaluje:
 
@@ -297,7 +314,14 @@ Dockerfile instaluje:
 - `unzip`,
 - `unrar-free`,
 - `Node.js 22` jako wspierany JavaScript runtime dla challenge solvera YouTube/yt-dlp.
-- `bgutil-ytdlp-pot-provider` jako lokalny sidecar generujący wymagane przez YouTube PO Tokeny; port `4416` pozostaje tylko w sieci Dockera.
+- plugin `bgutil-ytdlp-pot-provider` współpracujący z lokalnym sidecarem `bgutil-provider`, który generuje wymagane przez YouTube PO Tokeny; port `4416` pozostaje tylko w sieci Dockera.
+
+Po utracie lokalnego obrazu lub migracji na inny host nie trzeba wykonywać builda:
+
+```bash
+docker compose pull
+docker compose up -d
+```
 
 ## Development lokalny
 
@@ -324,11 +348,10 @@ Wyszukiwanie YouTube idzie przez `yt-dlp` i może trwać kilkanaście-kilkadzies
 
 ### YouTube zwraca 403 / Precondition failed / Requested format unavailable
 
-Aktualna konfiguracja używa Node.js 22, `yt-dlp-ejs` oraz sidecara `bgutil-provider` dla PO Tokenów. Najpierw zaktualizuj obrazy i przebuduj aplikację:
+Aktualna konfiguracja używa Node.js 22, `yt-dlp-ejs` oraz sidecara `bgutil-provider` dla PO Tokenów. Zaktualizuj publiczne obrazy:
 
 ```bash
-docker compose build --no-cache dodajmuzyke
-docker compose pull bgutil-provider
+docker compose pull
 docker compose up -d --force-recreate
 ```
 

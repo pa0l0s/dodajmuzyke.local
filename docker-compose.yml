@@ -7,8 +7,8 @@ services:
       - media
 
   dodajmuzyke:
-    build: .
-    image: dodajmuzyke:local
+    image: ghcr.io/pa0l0s/dodajmuzyke.local:latest
+    pull_policy: always
     container_name: dodajmuzyke
     restart: unless-stopped
     depends_on:
